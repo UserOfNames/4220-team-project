@@ -14,10 +14,10 @@ if __name__ == '__main__':
     _ = parser.add_argument('-d', '--debug-level', help='How many events to log. May be 0 (only errors) or 1 (all events).', type=int)
     args = parser.parse_args(namespace=ServerArgs())
 
+    # AF_INET: IPv4
+    # SOCK_STREAM: TCP
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
-        # AF_INET: IPv4
-        # SOCK_STREAM: TCP
         sock.bind(('', args.port)) # Empty string listens on all interfaces
         sock.listen(5) # Allow 5 unaccepted connections before dropping further requests
 
