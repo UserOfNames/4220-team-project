@@ -1,18 +1,10 @@
 import argparse, socket, sys
 
-# Slightly unfortunate hack to strongly type parsed arguments...
-# Without this, type checkers will flag the return type of parse_args() as Any.
-# By using this class as the namespace and hinting its attributes, we get our
-# strong typing back.
-class ServerArgs(argparse.Namespace):
-    port: int = -1       # Server must specify a port
-    debug_level: int = 0 # 0 is a reasonable default, no need to specify it manually
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Server-side implementation of the chat protocol')
     _ = parser.add_argument('-p', '--port', help='Port number to run the server on', type=int, required=True)
     _ = parser.add_argument('-d', '--debug-level', help='How many events to log. May be 0 (only errors) or 1 (all events).', type=int)
-    args = parser.parse_args(namespace=ServerArgs())
+    args = parser.parse_args()
 
     # AF_INET: IPv4
     # SOCK_STREAM: TCP
