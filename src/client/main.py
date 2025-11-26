@@ -23,7 +23,7 @@ Format: /command-name <parameter> [optional parameter]
 \tLeave the current (or named, if provided) channel
 
 /quit
-\tLeave chat, disconenct from server, and exit
+\tLeave chat, disconnect from server, and exit
 
 /help
 \tPrint out this help message
