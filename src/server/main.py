@@ -1,9 +1,11 @@
 import argparse, sys
+from sys import stderr
 
 import socket as sckt
 from socket import socket
 
 from src.protocol import commands
+from src.protocol.commands import ProtocolObject
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Server-side implementation of the chat protocol')
@@ -22,9 +24,30 @@ if __name__ == '__main__':
         # For now, we just connect to 1 client in a simple loop so we can test the protocol
         client_sock, (client_addr, client_port) = sock.accept()
         while True:
-            client_msg = commands.receive(client_sock)
-            if isinstance(client_msg, commands.CmdSendMessage):
-                print(client_msg.message)
+            client_msg: ProtocolObject | None = commands.receive(client_sock)
+
+            match client_msg:
+                case None:
+                    print("Disconnect detected. TODO: debug level, client ID report, ...")
+                    sys.exit(0) # TODO: Don't exit here when multiple clients are supported
+
+                case commands.CmdSendMessage(message=message):
+                    print(message)
+
+                case commands.CmdList():
+                    print("List")
+
+                case commands.CmdNick(nickname=nick):
+                    print(f"Nick {nick}")
+
+                case commands.CmdJoin(channel=channel):
+                    print(f"Join {channel}")
+
+                case commands.CmdLeave(channel=channel):
+                    print(f"Leave {channel}")
+
+                case _:
+                    print(f"Error: Unknown command {client_msg} TODO client ID report", file=stderr)
 
     except KeyboardInterrupt:
         print("\nDetected shutdown signal. Shutting down...")

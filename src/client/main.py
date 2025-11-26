@@ -1,4 +1,4 @@
-import pickle, socket
+import pickle, socket, sys
 from sys import stderr
 
 from src.protocol import commands
@@ -34,10 +34,11 @@ def handle_command(raw_command: str):
     command_parts = command_no_prefix.split()
 
     if len(command_parts) < 1:
-        # TODO: Error
+        print(f"Error: No command found.")
         return
     command = command_parts[0]
 
+    # TODO: Handle closed connections?
     match command:
         # TODO: Project requirements say "Connect to named server". How does
         # naming work?
@@ -53,19 +54,28 @@ def handle_command(raw_command: str):
                 print(f"Error: Connection refused", file=stderr)
 
         case 'nick':
-            pass
+            try:
+                commands.send(commands.CmdNick(command_parts[1]), sock)
+            except IndexError:
+                print(f"Error: Not enough arguments. Expected new nickname.", file=stderr)
 
         case 'list':
-            pass
+            commands.send(commands.CmdList(), sock)
 
         case 'join':
-            pass
+            try:
+                commands.send(commands.CmdJoin(command_parts[1]), sock)
+            except IndexError:
+                print(f"Error: Not enough arguments. Expected channel name.", file=stderr)
 
         case 'leave':
-            pass
+            target_channel = command_parts[1] if len(command_parts) > 1 else None
+            commands.send(commands.CmdLeave(target_channel), sock)
 
         case 'quit':
-            pass
+            sock.close()
+            print("Connection closed. Quitting...")
+            sys.exit(0)
 
         case 'help':
             print(help_block)
@@ -74,7 +84,8 @@ def handle_command(raw_command: str):
             print(f"Error: Invalid command {command}", file=stderr)
 
 def send_message(message: str):
-    pass
+    msg_obj = commands.CmdSendMessage(user_input, "channel placeholder")
+    commands.send(msg_obj, sock)
 
 if __name__ == '__main__':
     # AF_INET: IPv4
@@ -88,5 +99,4 @@ if __name__ == '__main__':
         if user_input.startswith('/'):
             handle_command(user_input)
         else:
-            msg_obj = commands.CmdSendMessage(user_input, "channel placeholder")
-            commands.send(msg_obj, sock)
+            send_message(user_input)
