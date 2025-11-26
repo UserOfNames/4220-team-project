@@ -1,4 +1,9 @@
-import argparse, socket, sys
+import argparse, sys
+
+import socket as sckt
+from socket import socket
+
+from src.protocol import commands
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Server-side implementation of the chat protocol')
@@ -8,15 +13,18 @@ if __name__ == '__main__':
 
     # AF_INET: IPv4
     # SOCK_STREAM: TCP
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock = socket(sckt.AF_INET, sckt.SOCK_STREAM)
     try:
         sock.bind(('', args.port)) # Empty string listens on all interfaces
         sock.listen(5) # Allow 5 unaccepted connections before dropping further requests
 
         # TODO: Multithreading, multiple clients, multiple channels
         # For now, we just connect to 1 client in a simple loop so we can test the protocol
+        client_sock, (client_addr, client_port) = sock.accept()
         while True:
-            client_sock, client_addr = sock.accept()
+            client_msg = commands.receive(client_sock)
+            if isinstance(client_msg, commands.CmdSendMessage):
+                print(client_msg.message)
 
     except KeyboardInterrupt:
         print("\nDetected shutdown signal. Shutting down...")

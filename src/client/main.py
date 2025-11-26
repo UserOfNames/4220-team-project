@@ -1,6 +1,8 @@
 import pickle, socket
 from sys import stderr
 
+from src.protocol import commands
+
 help_block = '''
 COMMANDS
 Format: /command-name <parameter> [optional parameter]
@@ -86,4 +88,5 @@ if __name__ == '__main__':
         if user_input.startswith('/'):
             handle_command(user_input)
         else:
-            send_message(user_input)
+            msg_obj = commands.CmdSendMessage(user_input, "channel placeholder")
+            commands.send(msg_obj, sock)
