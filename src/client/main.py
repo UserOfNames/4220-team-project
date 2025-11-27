@@ -1,7 +1,9 @@
-import pickle, socket, sys
+import socket, sys
+
 from sys import stderr
 
 from src.protocol import commands
+from src.protocol import shared
 
 help_block = '''
 COMMANDS
@@ -55,22 +57,22 @@ def handle_command(raw_command: str):
 
         case 'nick':
             try:
-                commands.send(commands.CmdNick(command_parts[1]), sock)
+                shared.send(commands.CmdNick(command_parts[1]), sock)
             except IndexError:
                 print(f"Error: Not enough arguments. Expected new nickname.", file=stderr)
 
         case 'list':
-            commands.send(commands.CmdList(), sock)
+            shared.send(commands.CmdList(), sock)
 
         case 'join':
             try:
-                commands.send(commands.CmdJoin(command_parts[1]), sock)
+                shared.send(commands.CmdJoin(command_parts[1]), sock)
             except IndexError:
                 print(f"Error: Not enough arguments. Expected channel name.", file=stderr)
 
         case 'leave':
             target_channel = command_parts[1] if len(command_parts) > 1 else None
-            commands.send(commands.CmdLeave(target_channel), sock)
+            shared.send(commands.CmdLeave(target_channel), sock)
 
         case 'quit':
             sock.close()
@@ -85,7 +87,7 @@ def handle_command(raw_command: str):
 
 def send_message(message: str):
     msg_obj = commands.CmdSendMessage(user_input, "channel placeholder")
-    commands.send(msg_obj, sock)
+    shared.send(msg_obj, sock)
 
 if __name__ == '__main__':
     # AF_INET: IPv4

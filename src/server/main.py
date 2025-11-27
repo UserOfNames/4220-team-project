@@ -1,11 +1,11 @@
-import argparse, sys
-from sys import stderr
+import argparse, sys, socket as sckt
 
-import socket as sckt
+from sys import stderr
 from socket import socket
 
 from src.protocol import commands
-from src.protocol.commands import ProtocolObject
+from src.protocol import shared
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Server-side implementation of the chat protocol')
@@ -24,7 +24,7 @@ if __name__ == '__main__':
         # For now, we just connect to 1 client in a simple loop so we can test the protocol
         client_sock, (client_addr, client_port) = sock.accept()
         while True:
-            client_msg: ProtocolObject | None = commands.receive(client_sock)
+            client_msg: commands.CommandObject | None = shared.receive(client_sock)
 
             match client_msg:
                 case None:
