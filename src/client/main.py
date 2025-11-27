@@ -40,7 +40,6 @@ def handle_command(raw_command: str):
         return
     command = command_parts[0]
 
-    # TODO: Handle closed connections?
     match command:
         # TODO: Project requirements say "Connect to named server". How does
         # naming work?
@@ -98,7 +97,12 @@ if __name__ == '__main__':
     while True:
         user_input = input(":> ")
 
-        if user_input.startswith('/'):
-            handle_command(user_input)
-        else:
-            send_message(user_input)
+        try:
+            if user_input.startswith('/'):
+                handle_command(user_input)
+            else:
+                send_message(user_input)
+
+        except BrokenPipeError:
+            print("Error: Broken connection. Please reconnect.", file=stderr)
+            continue
