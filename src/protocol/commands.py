@@ -1,4 +1,6 @@
-class CommandObject:
+from .shared import ProtocolObject
+
+class CommandObject(ProtocolObject):
     pass
 
 class CmdList(CommandObject):

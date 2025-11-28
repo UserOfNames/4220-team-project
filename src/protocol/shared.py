@@ -1,8 +1,9 @@
 import pickle, socket, struct
 
-from .commands import CommandObject
+class ProtocolObject:
+    pass
 
-def send(data: CommandObject, sock: socket.socket):
+def send(data: ProtocolObject, sock: socket.socket):
     serialized_data = pickle.dumps(data, protocol=pickle.HIGHEST_PROTOCOL)
 
     # Since we're using TCP, we must encode the length of the message before we
