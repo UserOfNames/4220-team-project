@@ -78,7 +78,7 @@ if __name__ == '__main__':
         _ = sel.register(sock, selectors.EVENT_READ, data=accept_connection)
 
         while True:
-            events = sel.select(timeout=300) # 5 minutes * 60 = 300 seconds
+            events = sel.select(timeout=180) # 3 minutes * 60 = 180 seconds
 
             if len(events) == 0:
                 print("Timed out. Shutting down...")
