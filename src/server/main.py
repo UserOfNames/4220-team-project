@@ -1,6 +1,7 @@
 import argparse
 
 import selectors
+from selectors import DefaultSelector
 
 import sys
 from sys import stderr
@@ -11,55 +12,112 @@ from socket import socket
 from src.protocol import commands
 from src.protocol import shared
 
-# Global selector. This is used to listen on connections without blocking.
-sel = selectors.DefaultSelector()
+class ChatServer:
+    __slots__ = ('selectors', 'connections', 'channels')
 
-# Callback for the listener socket.
-def accept_connection(key, mask):
-    sock = key.fileobj
-    client_sock, _ = sock.accept()
+    def __init__(self, port: int, debug_level: int):
+        # Global selector. This is used to listen on connections without blocking.
+        self.selectors: DefaultSelector = DefaultSelector()
 
-    # Necessary for selectors to work
-    client_sock.setblocking(False)
+        # Dictionary of active connections, mapping sockets to nicknames.
+        self.connections: dict[socket, str] = {}
 
-    _ = sel.register(client_sock, selectors.EVENT_READ, data=service_connection)
+        # TODO: Maybe don't hardcode the channels? Where would channel config go?
+        # Dictionary of channels, mapping channel names to connections.
+        self.channels: dict[str, set[socket]] = {
+            "General": set(),
+            "Meta": set(),
+            "Misc": set(),
+        }
 
-# Callback for client sockets.
-def service_connection(key, mask):
-    sock = key.fileobj
+        listener: socket = socket(sckt.AF_INET, sckt.SOCK_STREAM) # AF_INET: IPv4; SOCK_STREAM: TCP
+        listener.bind(('', port)) # Empty string listens on all interfaces
+        listener.listen(5) # Allow 5 unaccepted connections before dropping further requests
+        listener.setblocking(False) # Necessary for selectors to work
 
-    try:
-        client_msg = shared.receive(sock)
-        handle_command(sock, client_msg)
+        _ = self.selectors.register(listener, selectors.EVENT_READ, data=self._listener_callback)
 
-    except Exception as e:
-        # TODO: Error handling
-        print(f"Error in service_connection: {e}", file=stderr)
+    def run(self):
+        try:
+            while True:
+                events = self.selectors.select(timeout=180) # 3 minutes * 60 = 180 seconds
+                if len(events) == 0:
+                    print("Timed out. Shutting down...")
+                    break
 
-def handle_command(sock: socket, client_msg: commands.CommandObject | None):
-    match client_msg:
-        case None:
-            print("Disconnect detected. TODO: debug level, client ID report, ...")
-            _ = sel.unregister(sock)
-            sock.close()
+                for key, _ in events:
+                    callback = key.data
+                    callback(key)
 
-        case commands.CmdSendMessage(message=message):
-            print(message)
+        except KeyboardInterrupt:
+            print("\nDetected shutdown signal. Shutting down...")
+            # Further shutdown handling (closing sockets and connections) happens
+            # in the finally block, no need to do it here
 
-        case commands.CmdList():
-            print("List")
+        except Exception as e:
+            print(f"Unexpected error: {e}\nShutting down...")
 
-        case commands.CmdNick(nickname=nick):
-            print(f"Nick {nick}")
+        finally:
+            # Close all the open connections registered with the selector
+            for _, key in list(self.selectors.get_map().items()):
+                sock = key.fileobj
+                self.selectors.unregister(sock)
+                sock.close()
 
-        case commands.CmdJoin(channel=channel):
-            print(f"Join {channel}")
+            self.selectors.close()
 
-        case commands.CmdLeave(channel=channel):
-            print(f"Leave {channel}")
+    def handle_command(self, sock: socket, msg: commands.CommandObject):
+        match msg:
+            case commands.CmdSendMessage(message=message):
+                print(message)
 
-        case _:
-            print(f"Error: Unknown command {client_msg} TODO client ID report", file=stderr)
+            case commands.CmdList():
+                print("List")
+
+            case commands.CmdNick(nickname=nick):
+                print(f"Nick {nick}")
+                if nick in self.connections.values():
+                    # TODO: Error event; duplicate nickname
+                    pass
+                else:
+                    self.connections[sock] = nick
+
+            case commands.CmdJoin(channel=channel):
+                print(f"Join {channel}")
+
+            case commands.CmdLeave(channel=channel):
+                print(f"Leave {channel}")
+
+            case _:
+                print(f"Error: Unknown command {msg} TODO client ID report", file=stderr)
+
+    # Callback for the listener socket.
+    def _listener_callback(self, key):
+        sock = key.fileobj
+        client_sock, _ = sock.accept()
+
+        # Necessary for selectors to work
+        client_sock.setblocking(False)
+
+        _ = self.selectors.register(client_sock, selectors.EVENT_READ, data=self._message_callback)
+        self.connections[client_sock] = "placeholder" # TODO: Figure out a system for initial nicknames
+
+    # Callback for client sockets.
+    def _message_callback(self, key):
+        sock = key.fileobj
+
+        try:
+            client_msg = shared.receive(sock)
+            if client_msg is None:
+                print("Disconnect detected. TODO: debug level, client ID report, ...")
+                _ = self.selectors.unregister(sock)
+                sock.close()
+            else:
+                self.handle_command(sock, client_msg)
+
+        except Exception as e:
+            # TODO: Error handling
+            print(f"Error in service_connection: {e}", file=stderr)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Server-side implementation of the chat protocol')
@@ -67,37 +125,6 @@ if __name__ == '__main__':
     _ = parser.add_argument('-d', '--debug-level', help='How many events to log. May be 0 (only errors) or 1 (all events).', type=int)
     args = parser.parse_args()
 
-    # AF_INET: IPv4
-    # SOCK_STREAM: TCP
-    sock = socket(sckt.AF_INET, sckt.SOCK_STREAM)
-    try:
-        sock.bind(('', args.port)) # Empty string listens on all interfaces
-        sock.listen(5) # Allow 5 unaccepted connections before dropping further requests
-        sock.setblocking(False) # Necessary for selectors to work
-
-        _ = sel.register(sock, selectors.EVENT_READ, data=accept_connection)
-
-        while True:
-            events = sel.select(timeout=180) # 3 minutes * 60 = 180 seconds
-
-            if len(events) == 0:
-                print("Timed out. Shutting down...")
-                break
-
-            for key, mask in events:
-                callback = key.data
-                callback(key, mask)
-
-
-    except KeyboardInterrupt:
-        print("\nDetected shutdown signal. Shutting down...")
-        # Further shutdown handling (closing sockets and connections) happens
-        # in the finally block, no need to do it here
-
-    except Exception as e:
-        print(f"Unexpected error: {e}\nShutting down...")
-
-    finally:
-        sock.close()
-        sel.close()
-        sys.exit(0)
+    server = ChatServer(args.port, args.debug_level)
+    server.run()
+    sys.exit(0)
