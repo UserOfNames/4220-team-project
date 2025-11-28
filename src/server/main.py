@@ -1,11 +1,65 @@
-import argparse, sys, socket as sckt
+import argparse
 
+import selectors
+
+import sys
 from sys import stderr
+
+import socket as sckt
 from socket import socket
 
 from src.protocol import commands
 from src.protocol import shared
 
+# Global selector. This is used to listen on connections without blocking.
+sel = selectors.DefaultSelector()
+
+# Callback for the listener socket.
+def accept_connection(key, mask):
+    sock = key.fileobj
+    client_sock, _ = sock.accept()
+
+    # Necessary for selectors to work
+    client_sock.setblocking(False)
+
+    _ = sel.register(client_sock, selectors.EVENT_READ, data=service_connection)
+
+# Callback for client sockets.
+def service_connection(key, mask):
+    sock = key.fileobj
+
+    try:
+        client_msg = shared.receive(sock)
+        handle_command(sock, client_msg)
+
+    except Exception as e:
+        # TODO: Error handling
+        print(f"Error in service_connection: {e}", file=stderr)
+
+def handle_command(sock: socket, client_msg: commands.CommandObject | None):
+    match client_msg:
+        case None:
+            print("Disconnect detected. TODO: debug level, client ID report, ...")
+            _ = sel.unregister(sock)
+            sock.close()
+
+        case commands.CmdSendMessage(message=message):
+            print(message)
+
+        case commands.CmdList():
+            print("List")
+
+        case commands.CmdNick(nickname=nick):
+            print(f"Nick {nick}")
+
+        case commands.CmdJoin(channel=channel):
+            print(f"Join {channel}")
+
+        case commands.CmdLeave(channel=channel):
+            print(f"Leave {channel}")
+
+        case _:
+            print(f"Error: Unknown command {client_msg} TODO client ID report", file=stderr)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Server-side implementation of the chat protocol')
@@ -19,35 +73,17 @@ if __name__ == '__main__':
     try:
         sock.bind(('', args.port)) # Empty string listens on all interfaces
         sock.listen(5) # Allow 5 unaccepted connections before dropping further requests
+        sock.setblocking(False) # Necessary for selectors to work
 
-        # TODO: Multithreading, multiple clients, multiple channels
-        # For now, we just connect to 1 client in a simple loop so we can test the protocol
-        client_sock, (client_addr, client_port) = sock.accept()
+        _ = sel.register(sock, selectors.EVENT_READ, data=accept_connection)
+
         while True:
-            client_msg: commands.CommandObject | None = shared.receive(client_sock)
+            events = sel.select(timeout=None)
 
-            match client_msg:
-                case None:
-                    print("Disconnect detected. TODO: debug level, client ID report, ...")
-                    sys.exit(0) # TODO: Don't exit here when multiple clients are supported
+            for key, mask in events:
+                callback = key.data
+                callback(key, mask)
 
-                case commands.CmdSendMessage(message=message):
-                    print(message)
-
-                case commands.CmdList():
-                    print("List")
-
-                case commands.CmdNick(nickname=nick):
-                    print(f"Nick {nick}")
-
-                case commands.CmdJoin(channel=channel):
-                    print(f"Join {channel}")
-
-                case commands.CmdLeave(channel=channel):
-                    print(f"Leave {channel}")
-
-                case _:
-                    print(f"Error: Unknown command {client_msg} TODO client ID report", file=stderr)
 
     except KeyboardInterrupt:
         print("\nDetected shutdown signal. Shutting down...")
@@ -58,7 +94,6 @@ if __name__ == '__main__':
         print(f"Unexpected error: {e}\nShutting down...")
 
     finally:
-        if sock:
-            sock.close()
-
+        sock.close()
+        sel.close()
         sys.exit(0)
