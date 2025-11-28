@@ -38,35 +38,25 @@ class ChatServer:
         _ = self.selectors.register(listener, selectors.EVENT_READ, data=self._listener_callback)
 
     def run(self):
-        try:
-            while True:
-                events = self.selectors.select(timeout=180) # 3 minutes * 60 = 180 seconds
-                if len(events) == 0:
-                    print("Timed out. Shutting down...")
-                    break
+        while True:
+            events = self.selectors.select(timeout=180) # 3 minutes * 60 = 180 seconds
+            if len(events) == 0:
+                raise TimeoutError
 
-                for key, _ in events:
-                    callback = key.data
-                    callback(key)
+            for key, _ in events:
+                callback = key.data
+                callback(key)
 
-        except KeyboardInterrupt:
-            print("\nDetected shutdown signal. Shutting down...")
-            # Further shutdown handling (closing sockets and connections) happens
-            # in the finally block, no need to do it here
+    def shutdown(self):
+        # Close all the open connections registered with the selector
+        for _, key in list(self.selectors.get_map().items()):
+            sock: socket = key.fileobj
+            self.selectors.unregister(sock)
+            sock.close()
 
-        except Exception as e:
-            print(f"Unexpected error: {e}\nShutting down...")
+        self.selectors.close()
 
-        finally:
-            # Close all the open connections registered with the selector
-            for _, key in list(self.selectors.get_map().items()):
-                sock = key.fileobj
-                self.selectors.unregister(sock)
-                sock.close()
-
-            self.selectors.close()
-
-    def handle_command(self, sock: socket, msg: commands.CommandObject):
+    def _handle_command(self, sock: socket, msg: commands.CommandObject):
         match msg:
             case commands.CmdSendMessage(message=message):
                 print(message)
@@ -113,11 +103,11 @@ class ChatServer:
                 _ = self.selectors.unregister(sock)
                 sock.close()
             else:
-                self.handle_command(sock, client_msg)
+                self._handle_command(sock, client_msg)
 
         except Exception as e:
-            # TODO: Error handling
-            print(f"Error in service_connection: {e}", file=stderr)
+            # TODO: Improve error message
+            print(f"Error while handling client: {e}", file=stderr)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Server-side implementation of the chat protocol')
@@ -125,6 +115,21 @@ if __name__ == '__main__':
     _ = parser.add_argument('-d', '--debug-level', help='How many events to log. May be 0 (only errors) or 1 (all events).', type=int)
     args = parser.parse_args()
 
+    exit_code = 0
     server = ChatServer(args.port, args.debug_level)
-    server.run()
-    sys.exit(0)
+    try:
+        server.run()
+
+    except KeyboardInterrupt:
+        print("\nDetected shutdown signal. Shutting down...")
+
+    except TimeoutError:
+        print("Timed out. Shutting down...")
+
+    except Exception as e:
+        print(f"Unexpected error: {e}\nShutting down...")
+        exit_code = 1
+
+    finally:
+        server.shutdown()
+        sys.exit(exit_code)
