@@ -1,8 +1,9 @@
 import socket as sckt
 from socket import socket
 
-import sys
 from sys import stderr
+
+import threading
 
 from src.protocol import commands
 from src.protocol import events
@@ -41,15 +42,41 @@ class ChatClient:
         # Otherwise, the socket for the connection is stored here.
         self.connection: socket | None = None
 
+        # To allow simultaneously listening for user input and events from the
+        # server, we spawn a separate listener thread while connections are live.
+        self.listener: threading.Thread | None = None
+
     def connect(self, target_host: str, target_port: int):
         sock = socket(sckt.AF_INET, sckt.SOCK_STREAM)
         sock.connect((target_host, target_port))
         self.connection = sock
 
+        self.listener = threading.Thread(target=self.listener_thread, daemon=True)
+        self.listener.start()
+
     def disconnect(self):
         if self.connection:
+            self.connection.shutdown(sckt.SHUT_RDWR)
             self.connection.close()
-            self.connection = None
+        self.connection = None
+        self.listener = None
+
+    def listener_thread(self):
+        while self.connection is not None:
+            try:
+                event = shared.receive(self.connection)
+
+                if event is None:
+                    print("\nServer disconnected.")
+                    self.disconnect()
+                    break
+
+                # TODO: Handle events
+
+            # TODO: Catch exceptions; which exceptions are expected?
+            except Exception as e:
+                print(f"Unexpected error in listener thread: {e}")
+                break
 
     def send_to_server(self, msg: commands.CommandObject):
         if self.connection:
@@ -101,8 +128,7 @@ class ChatClient:
 
             case 'quit':
                 self.disconnect()
-                print("Connection closed. Quitting...")
-                sys.exit(0)
+                print("Disconnected from server.")
 
             case 'help':
                 print(help_block)
