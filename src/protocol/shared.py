@@ -1,9 +1,16 @@
 import pickle, socket, struct
 
 class ProtocolObject:
+    """
+    Base class for all protocol communication.
+    """
     pass
 
 def send(data: ProtocolObject, sock: socket.socket):
+    """
+    Send a message via a TCP socket. Uses length-prefixing to form discrete
+    messages.
+    """
     serialized_data = pickle.dumps(data, protocol=pickle.HIGHEST_PROTOCOL)
 
     # Since we're using TCP, we must encode the length of the message before we
@@ -14,19 +21,25 @@ def send(data: ProtocolObject, sock: socket.socket):
     sock.sendall(length + serialized_data)
 
 def receive(sock: socket.socket):
+    """
+    Receive a message sent via `send()` and decode it.
+    """
     # Length header is 4 bytes (see `send` implementation)
-    length_bytes: bytes | None = recv_n(sock, 4)
+    length_bytes: bytes | None = _recv_n(sock, 4)
     if length_bytes is None:
         return None
     length: int = struct.unpack('!I', length_bytes)[0]
 
-    raw_msg: bytes | None = recv_n(sock, length)
+    raw_msg: bytes | None = _recv_n(sock, length)
     if raw_msg is None:
         raise ConnectionResetError("Connection closed unexpectedly.")
 
     return pickle.loads(raw_msg)
 
-def recv_n(sock: socket.socket, n: int) -> bytes | None:
+def _recv_n(sock: socket.socket, n: int) -> bytes | None:
+    """
+    Internal helper function for `receive()`.
+    """
     res = bytearray()
 
     while len(res) < n:
