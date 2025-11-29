@@ -94,8 +94,6 @@ class ChatClient:
         command = command_parts[0]
 
         match command:
-            # TODO: Project requirements say "Connect to named server". How does
-            # naming work?
             case 'connect':
                 try:
                     target_host: str = command_parts[1]
