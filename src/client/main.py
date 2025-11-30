@@ -156,4 +156,10 @@ class ChatClient:
 
 if __name__ == '__main__':
     client = ChatClient()
-    client.run()
+
+    try:
+        client.run()
+
+    except KeyboardInterrupt:
+        print("\nQuitting...")
+        client.disconnect()
