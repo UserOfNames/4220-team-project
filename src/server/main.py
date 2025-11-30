@@ -165,6 +165,9 @@ class ChatServer:
                     print(f"Client {sock.getpeername()} disconnected.")
 
                 _ = self.connections.pop(sock, None)
+                for conns_set in self.channels.values():
+                    if sock in conns_set:
+                        conns_set.remove(sock)
                 _ = self.selectors.unregister(sock)
                 sock.close()
             else:
