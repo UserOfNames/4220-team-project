@@ -73,13 +73,12 @@ class ChatClient:
                 event = shared.receive(self.connection)
 
                 if event is None:
-                    print("\nServer disconnected.")
+                    print("\nDisconnected.")
                     self.disconnect()
                     break
 
                 self.handle_event(event)
 
-            # TODO: Catch exceptions; which exceptions are expected?
             except Exception as e:
                 print(f"Unexpected error in listener thread: {e}")
                 break
