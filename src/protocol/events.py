@@ -28,9 +28,9 @@ class EventList(EventObject):
     """
     __slots__ = ('num_users', 'channels')
 
-    def __init__(self, num_users: int, channels: tuple[str]):
+    def __init__(self, num_users: int, channels: tuple[str, ...]):
         self.num_users: int = num_users
-        self.channels: tuple[str] = channels
+        self.channels: tuple[str, ...] = channels
 
 class EventJoin(EventObject):
     """
@@ -59,8 +59,7 @@ class EventError(EventObject):
     Event: An error occurred.
     Response: Report the error to the relevant user(s).
     """
-    __slots__ = ('relevant_user_nicks', 'error')
+    __slots__ = ('error')
 
-    def __init__(self, relevant_user_nicks: tuple[str], error: Any):
-        self.relevant_user_nicks: tuple[str] = relevant_user_nicks
+    def __init__(self, error: Any):
         self.error: Any = error

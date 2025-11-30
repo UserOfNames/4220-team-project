@@ -66,14 +66,12 @@ class ChatClient:
             try:
                 event = shared.receive(self.connection)
 
-                match event:
-                    case None:
-                        print("\nServer disconnected.")
-                        self.disconnect()
-                        break
+                if event is None:
+                    print("\nServer disconnected.")
+                    self.disconnect()
+                    break
 
-                    case events.EventReceiveMessage(sender_nick=nick, message=message, channel=channel):
-                        print(f"[{channel}] {nick}: {message}")
+                self.handle_event(event)
 
             # TODO: Catch exceptions; which exceptions are expected?
             except Exception as e:
@@ -135,6 +133,26 @@ class ChatClient:
 
             case _:
                 print(f"Error: Invalid command {command}", file=stderr)
+
+    def handle_event(self, event: events.EventObject):
+        match event:
+            case events.EventReceiveMessage(sender_nick=nick, message=message, channel=channel):
+                print(f"[{channel}] {nick}: {message}")
+
+            case events.EventList(num_users=num_users, channels=channels):
+                print(f"There are {num_users} total users on the server.")
+                print("Channels:")
+                for channel in channels:
+                    print(channel)
+
+            case events.EventJoin(new_user_nick=new_user_nick, channel=channel):
+                pass
+
+            case events.EventLeave(left_user_nick=left_user_nick, channel=channel):
+                pass
+
+            case events.EventError(error=error):
+                pass
 
     def send_message(self, message: str):
         msg_obj = commands.CmdSendMessage(message, "channel placeholder")

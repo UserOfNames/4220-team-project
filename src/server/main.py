@@ -68,17 +68,20 @@ class ChatServer:
 
         self.selectors.close()
 
-    def _handle_command(self, sock: socket, msg: commands.CommandObject):
+    def _handle_command(self, origin: socket, msg: commands.CommandObject):
         match msg:
             case commands.CmdSendMessage(message=message, channel=channel):
-                sender_nick = self.connections[sock]
-
+                sender_nick = self.connections[origin]
+                response = events.EventReceiveMessage(sender_nick, message, channel)
                 for conn in self.connections.keys():
-                    response = events.EventReceiveMessage(sender_nick, message, channel)
-                    shared.send(response, conn)
+                    if conn != origin:
+                        shared.send(response, conn)
 
             case commands.CmdList():
-                print("List")
+                num_users = len(self.connections)
+                channels = tuple(self.channels.keys())
+                response = events.EventList(num_users, channels)
+                shared.send(response, origin)
 
             case commands.CmdNick(nickname=nick):
                 print(f"Nick {nick}")
@@ -86,7 +89,7 @@ class ChatServer:
                     # TODO: Error event; duplicate nickname
                     pass
                 else:
-                    self.connections[sock] = nick
+                    self.connections[origin] = nick
 
             case commands.CmdJoin(channel=channel):
                 print(f"Join {channel}")
