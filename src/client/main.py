@@ -148,6 +148,9 @@ class ChatClient:
             case events.EventJoin(new_user_nick=new_user_nick, channel=channel):
                 print(f"{new_user_nick} has joined {channel}.")
 
+            case events.EventNick(old_nick=old_nick, new_nick=new_nick):
+                print(f"{old_nick} changed name to {new_nick}")
+
             case events.EventLeave(left_user_nick=left_user_nick, channel=channel):
                 print(f"{left_user_nick} has left {channel}")
 

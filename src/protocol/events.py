@@ -21,6 +21,9 @@ class EventReceiveMessage(EventObject):
         self.message: str = message
         self.channel: str = channel
 
+    def __str__(self):
+        return f"EventReceiveMessage({self.sender_nick}, {self.message}, {self.channel})"
+
 class EventList(EventObject):
     """
     Event: A client requested a list of channels and number of users.
@@ -31,6 +34,23 @@ class EventList(EventObject):
     def __init__(self, num_users: int, channels: tuple[str, ...]):
         self.num_users: int = num_users
         self.channels: tuple[str, ...] = channels
+
+    def __str__(self):
+        return f"EventList({self.num_users}, {self.channels})"
+
+class EventNick(EventObject):
+    """
+    Event: A client requested a new nickname.
+    Reponse: Report the nickname change to all clients.
+    """
+    __slots__ = ('old_nick', 'new_nick')
+
+    def __init__(self, old_nick: str, new_nick: str):
+        self.old_nick: str = old_nick
+        self.new_nick: str = new_nick
+
+    def __str__(self):
+        return f"EventNick({self.old_nick}, {self.new_nick})"
 
 class EventJoin(EventObject):
     """
@@ -43,6 +63,9 @@ class EventJoin(EventObject):
         self.new_user_nick: str = new_user_nick
         self.channel: str = channel
 
+    def __str__(self):
+        return f"EventJoin({self.new_user_nick}, {self.channel})"
+
 class EventLeave(EventObject):
     """
     Event: A user left the channel.
@@ -54,6 +77,9 @@ class EventLeave(EventObject):
         self.left_user_nick: str = left_user_nick
         self.channel: str = channel
 
+    def __str__(self):
+        return f"EventLeave({self.left_user_nick}, {self.channel})"
+
 class EventError(EventObject):
     """
     Event: An error occurred.
@@ -63,3 +89,6 @@ class EventError(EventObject):
 
     def __init__(self, error: Any):
         self.error: Any = error
+
+    def __str__(self):
+        return f"{self.error}"
