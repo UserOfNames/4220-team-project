@@ -70,88 +70,74 @@ class ChatServer:
 
         self.selectors.close()
 
-    # TODO: Fix duplicate events
-    def send_event(self, event: events.EventObject, target: socket):
-        if isinstance(event, events.EventError):
-            print(f"ERROR:\nOrigin: {target.getpeername()}\n{event}\n", file=stderr)
-        elif self.debug_level == 1:
-            print(f"EVENT:\nOrigin: {target.getpeername()}\n{event}\n")
-
-        shared.send(event, target)
-
     # Process commands from the client.
     def _handle_command(self, origin: socket, msg: commands.CommandObject):
         origin_nick = self.connections[origin]
+        targets: set[socket] = set()
+        response: events.EventObject = events.EventObject()
+        error: events.EventError | None = None
 
         match msg:
             case commands.CmdSendMessage(message=message, channel=channel):
                 try:
-                    target = self.channels[channel]
+                    targets = self.channels[channel]
+                    if origin not in targets:
+                        error = events.EventError(f"Not in channel '{channel}', consider joining")
+                    else:
+                        response = events.EventReceiveMessage(origin_nick, message, channel)
+
                 except KeyError:
                     error = events.EventError(f"Channel '{channel}' not found")
-                    self.send_event(error, origin)
-                    return
-
-                if origin not in target:
-                    error = events.EventError(f"Not in channel '{channel}', consider joining")
-                    self.send_event(error, origin)
-                    return
-
-                response = events.EventReceiveMessage(origin_nick, message, channel)
-                for conn in target:
-                    self.send_event(response, conn)
 
             case commands.CmdList():
                 num_users = len(self.connections)
                 channels = tuple(self.channels.keys())
                 response = events.EventList(num_users, channels)
-                self.send_event(response, origin)
+                targets = {origin}
 
             case commands.CmdNick(nickname=new_nick):
                 if new_nick in self.connections.values():
                     error = events.EventError("Duplicate nickname")
-                    self.send_event(error, origin)
                 else:
                     old_nick = self.connections[origin]
                     self.connections[origin] = new_nick
                     response = events.EventNick(old_nick, new_nick)
-
-                    for conn in self.connections.keys():
-                        self.send_event(response, conn)
+                    targets = set(self.connections.keys())
 
             case commands.CmdJoin(channel=channel):
                 try:
-                    target = self.channels[channel]
+                    targets = self.channels[channel]
+                    targets.add(origin)
+                    response = events.EventJoin(origin_nick, channel)
+
                 except KeyError:
                     error = events.EventError(f"Channel '{channel}' not found")
-                    self.send_event(error, origin)
-                    return
-
-                target.add(origin)
-                response = events.EventJoin(origin_nick, channel)
-                for conn in target:
-                    self.send_event(response, conn)
 
             case commands.CmdLeave(channel=channel):
                 if channel not in self.channels:
                     error = events.EventError(f"Channel '{channel}' not found")
-                    self.send_event(error, origin)
-                    return
+                else:
+                    try:
+                        targets = self.channels[channel]
+                        targets.remove(origin)
+                        response = events.EventLeave(origin_nick, channel)
 
-                try:
-                    target = self.channels[channel]
-                    target.remove(origin)
-                except KeyError:
-                    error = events.EventError(f"Not a member of '{channel}'")
-                    self.send_event(error, origin)
-                    return
-
-                response = events.EventLeave(origin_nick, channel)
-                for conn in target:
-                    self.send_event(response, conn)
+                    except KeyError:
+                        error = events.EventError(f"Not a member of '{channel}'")
 
             case _:
                 print(f"Error: Unknown command '{msg}'", file=stderr)
+
+        # End of match block
+        if error is not None:
+            print(f"ERROR:\nOrigin: {origin.getpeername()}\n{error}\n", file=stderr)
+            shared.send(error, origin)
+        else:
+            if self.debug_level == 1:
+                print(f"EVENT:\nOrigin: {origin.getpeername()}\n{response}\n")
+
+            for conn in targets:
+                shared.send(response, conn)
 
     # Callback for the listener socket.
     def _listener_callback(self, key):
