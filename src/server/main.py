@@ -1,5 +1,7 @@
 import argparse
 
+from queue import Queue
+
 import selectors
 from selectors import DefaultSelector
 
@@ -9,15 +11,29 @@ from sys import stderr
 import socket as sckt
 from socket import socket
 
+import threading
+
 from src.protocol import commands
 from src.protocol import events
 from src.protocol import shared
 
 class ChatServer:
-    __slots__ = ('debug_level', 'username_generator', 'selectors', 'connections', 'channels')
+    __slots__ = (
+        'debug_level',
+        'username_generator',
+        'selectors',
+        'connections',
+        'channels',
+        'lock',
+        'work_queue',
+    )
 
     def __init__(self, port: int, debug_level: int):
         self.debug_level: int = debug_level
+
+        # Used for the 3 worker threads
+        self.lock: threading.Lock = threading.Lock()
+        self.work_queue: Queue[tuple[socket, commands.CommandObject]] = Queue()
 
         # Used to generate the initial username of a new clint
         self.username_generator = self.gen_initial_username()
@@ -43,6 +59,26 @@ class ChatServer:
         listener.setblocking(False) # Necessary for selectors to work
 
         _ = self.selectors.register(listener, selectors.EVENT_READ, data=self._listener_callback)
+
+        # Start the worker threads
+        for i in range(3):
+            t = threading.Thread(target=self._worker_thread, daemon=True)
+            t.start()
+
+    def _worker_thread(self):
+        while True:
+            # Note: queue.Queue is inherently blocking and thread-safe, so no
+            # locking is required here.
+            origin, event = self.work_queue.get()
+            try:
+                with self.lock:
+                    self._handle_command(origin, event)
+
+            except Exception as e:
+                print(f"Error in worker thread: {e}", file=stderr)
+
+            finally:
+                self.work_queue.task_done()
 
     def gen_initial_username(self):
         x = 0
@@ -149,8 +185,11 @@ class ChatServer:
 
         _ = self.selectors.register(client_sock, selectors.EVENT_READ, data=self._message_callback)
 
-        initial_nickname = next(self.username_generator)
-        self.connections[client_sock] = initial_nickname
+        # Workers may be accessing self.connections, so we have to lock here
+        with self.lock:
+            initial_nickname = next(self.username_generator)
+            self.connections[client_sock] = initial_nickname
+
         if self.debug_level == 1:
             print(f"New client {client_sock.getpeername()} connected with initial nickname {initial_nickname}")
 
@@ -160,18 +199,26 @@ class ChatServer:
 
         try:
             client_msg = shared.receive(sock)
-            if client_msg is None:
-                if self.debug_level == 1:
-                    print(f"Client {sock.getpeername()} disconnected.")
 
-                _ = self.connections.pop(sock, None)
-                for conns_set in self.channels.values():
-                    if sock in conns_set:
-                        conns_set.remove(sock)
-                _ = self.selectors.unregister(sock)
-                sock.close()
+            # This indicates a disconnect
+            if client_msg is None:
+                # Must lock here, since workers may be busy reading self.connections
+                with self.lock:
+                    if self.debug_level == 1:
+                        print(f"Client {sock.getpeername()} disconnected.")
+
+                    _ = self.connections.pop(sock, None)
+
+                    for conns_set in self.channels.values():
+                        if sock in conns_set:
+                            conns_set.remove(sock)
+
+                    _ = self.selectors.unregister(sock)
+
+                    sock.close()
             else:
-                self._handle_command(sock, client_msg)
+                # Queues are inherently thread safe, so we don't need to lock here
+                self.work_queue.put((sock, client_msg))
 
         except Exception as e:
             print(f"Error while handling client {sock.getpeername()}: {e}", file=stderr)
