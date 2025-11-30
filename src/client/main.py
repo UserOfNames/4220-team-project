@@ -131,7 +131,6 @@ class ChatClient:
 
             case 'quit':
                 self.disconnect()
-                print("Disconnected from server.")
 
             case 'help':
                 print(help_block)
