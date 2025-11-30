@@ -70,6 +70,7 @@ class ChatServer:
 
         self.selectors.close()
 
+    # TODO: Fix duplicate events
     def send_event(self, event: events.EventObject, target: socket):
         if isinstance(event, events.EventError):
             print(f"ERROR:\nOrigin: {target.getpeername()}\n{event}\n", file=stderr)
@@ -87,12 +88,12 @@ class ChatServer:
                 try:
                     target = self.channels[channel]
                 except KeyError:
-                    error = events.EventError(f"Channel {channel} not found")
+                    error = events.EventError(f"Channel '{channel}' not found")
                     self.send_event(error, origin)
                     return
 
                 if origin not in target:
-                    error = events.EventError(f"Not in channel {channel}, consider joining")
+                    error = events.EventError(f"Not in channel '{channel}', consider joining")
                     self.send_event(error, origin)
                     return
 
@@ -122,7 +123,7 @@ class ChatServer:
                 try:
                     target = self.channels[channel]
                 except KeyError:
-                    error = events.EventError(f"Channel {channel} not found")
+                    error = events.EventError(f"Channel '{channel}' not found")
                     self.send_event(error, origin)
                     return
 
@@ -132,12 +133,8 @@ class ChatServer:
                     self.send_event(response, conn)
 
             case commands.CmdLeave(channel=channel):
-                # TODO: Solve the channel None issue; this will require some
-                # remodeling some stuff, like making the client track the active
-                # channel, removing the None case and sending the active channel,
-                # etc.
                 if channel not in self.channels:
-                    error = events.EventError(f"Channel {channel} not found")
+                    error = events.EventError(f"Channel '{channel}' not found")
                     self.send_event(error, origin)
                     return
 
@@ -145,7 +142,7 @@ class ChatServer:
                     target = self.channels[channel]
                     target.remove(origin)
                 except KeyError:
-                    error = events.EventError(f"Not a member of {channel}")
+                    error = events.EventError(f"Not a member of '{channel}'")
                     self.send_event(error, origin)
                     return
 
@@ -154,7 +151,7 @@ class ChatServer:
                     self.send_event(response, conn)
 
             case _:
-                print(f"Error: Unknown command {msg}", file=stderr)
+                print(f"Error: Unknown command '{msg}'", file=stderr)
 
     # Callback for the listener socket.
     def _listener_callback(self, key):
@@ -188,8 +185,7 @@ class ChatServer:
                 self._handle_command(sock, client_msg)
 
         except Exception as e:
-            # TODO: Improve error message
-            print(f"Error while handling client: {e}", file=stderr)
+            print(f"Error while handling client {sock.getpeername()}: {e}", file=stderr)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Server-side implementation of the chat protocol')

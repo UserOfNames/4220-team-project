@@ -1,9 +1,6 @@
 from typing import Any
 from .shared import ProtocolObject
 
-# TODO: Determine if these events are properly designed, if more events are
-# needed, etc.
-
 class EventObject(ProtocolObject):
     """Base class for all events."""
     pass

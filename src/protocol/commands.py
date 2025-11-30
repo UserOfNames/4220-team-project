@@ -31,15 +31,13 @@ class CmdJoin(CommandObject):
         self.channel: str = channel
 
 class CmdLeave(CommandObject):
-    # TODO: Is 'leave all channels' the correct interpretation of no-args
-    # `/leave`?
     """
     Command: Leave the chosen channel, or all channels.
     """
     __slots__ = ('channel')
 
-    def __init__(self, channel: str | None):
-        self.channel: str | None = channel
+    def __init__(self, channel: str):
+        self.channel: str = channel
 
 class CmdSendMessage(CommandObject):
     """

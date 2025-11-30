@@ -34,6 +34,9 @@ Format: /command-name <parameter> [optional parameter]
 
 /help
 \tPrint out this help message
+
+/switch <channel>
+\tMake the name channel active
 '''
 
 class ChatClient:
@@ -45,6 +48,9 @@ class ChatClient:
         # To allow simultaneously listening for user input and events from the
         # server, we spawn a separate listener thread while connections are live.
         self.listener: threading.Thread | None = None
+
+        # Track the currently active channel.
+        self.channel: str = ""
 
     def connect(self, target_host: str, target_port: int):
         sock = socket(sckt.AF_INET, sckt.SOCK_STREAM)
@@ -121,7 +127,7 @@ class ChatClient:
                     print(f"Error: Not enough arguments. Expected channel name.", file=stderr)
 
             case 'leave':
-                target_channel = command_parts[1] if len(command_parts) > 1 else None
+                target_channel = command_parts[1] if len(command_parts) > 1 else self.channel
                 self.send_to_server(commands.CmdLeave(target_channel))
 
             case 'quit':
@@ -130,6 +136,12 @@ class ChatClient:
 
             case 'help':
                 print(help_block)
+
+            case 'switch':
+                try:
+                    self.channel = command_parts[1]
+                except IndexError:
+                    print(f"Error: Not enough arguments. Expected channel name.", file=stderr)
 
             case _:
                 print(f"Error: Invalid command {command}", file=stderr)
@@ -161,8 +173,7 @@ class ChatClient:
                 print("[Server] Unknown event received.")
 
     def send_message(self, message: str):
-        # TODO: Don't hardcode the channel
-        msg_obj = commands.CmdSendMessage(message, "General")
+        msg_obj = commands.CmdSendMessage(message, self.channel)
         self.send_to_server(msg_obj)
 
     def run(self):
