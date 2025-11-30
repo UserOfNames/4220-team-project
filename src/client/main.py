@@ -76,8 +76,8 @@ class ChatClient:
                     print("\nDisconnected.")
                     self.disconnect()
                     break
-
-                self.handle_event(event)
+                else:
+                    self.handle_event(event)
 
             except Exception as e:
                 print(f"Unexpected error in listener thread: {e}")
