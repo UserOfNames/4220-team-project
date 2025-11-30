@@ -14,11 +14,12 @@ class EventReceiveMessage(EventObject):
     Response: Relay the message to all other clients, with information about
     the sender.
     """
-    __slots__ = ('sender_nick', 'message')
+    __slots__ = ('sender_nick', 'message', 'channel')
 
-    def __init__(self, sender_nick: str, message: str):
+    def __init__(self, sender_nick: str, message: str, channel: str):
         self.sender_nick: str = sender_nick
         self.message: str = message
+        self.channel: str = channel
 
 class EventList(EventObject):
     """

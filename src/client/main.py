@@ -66,12 +66,14 @@ class ChatClient:
             try:
                 event = shared.receive(self.connection)
 
-                if event is None:
-                    print("\nServer disconnected.")
-                    self.disconnect()
-                    break
+                match event:
+                    case None:
+                        print("\nServer disconnected.")
+                        self.disconnect()
+                        break
 
-                # TODO: Handle events
+                    case events.EventReceiveMessage(sender_nick=nick, message=message, channel=channel):
+                        print(f"[{channel}] {nick}: {message}")
 
             # TODO: Catch exceptions; which exceptions are expected?
             except Exception as e:
@@ -141,7 +143,7 @@ class ChatClient:
     def run(self):
         print("Enter '/help' for help.")
         while True:
-            user_input = input(":> ")
+            user_input = input()
             try:
                 if user_input.startswith('/'):
                     self.handle_command(user_input)

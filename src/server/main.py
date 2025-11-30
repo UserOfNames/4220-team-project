@@ -10,7 +10,18 @@ import socket as sckt
 from socket import socket
 
 from src.protocol import commands
+from src.protocol import events
 from src.protocol import shared
+
+class Channel:
+    """
+    Object representing a channel.
+    """
+    __slots__ = ('id', 'name')
+
+    def __init__(self, id: int, name: str):
+        self.id: int = id
+        self.name: str = name
 
 class ChatServer:
     __slots__ = ('selectors', 'connections', 'channels')
@@ -31,6 +42,7 @@ class ChatServer:
         }
 
         listener: socket = socket(sckt.AF_INET, sckt.SOCK_STREAM) # AF_INET: IPv4; SOCK_STREAM: TCP
+        listener.setsockopt(sckt.SOL_SOCKET, sckt.SO_REUSEADDR, 1) # Fix 'address already in use'
         listener.bind(('', port)) # Empty string listens on all interfaces
         listener.listen(5) # Allow 5 unaccepted connections before dropping further requests
         listener.setblocking(False) # Necessary for selectors to work
@@ -58,8 +70,12 @@ class ChatServer:
 
     def _handle_command(self, sock: socket, msg: commands.CommandObject):
         match msg:
-            case commands.CmdSendMessage(message=message):
-                print(message)
+            case commands.CmdSendMessage(message=message, channel=channel):
+                sender_nick = self.connections[sock]
+
+                for conn in self.connections.keys():
+                    response = events.EventReceiveMessage(sender_nick, message, channel)
+                    shared.send(response, conn)
 
             case commands.CmdList():
                 print("List")
@@ -100,6 +116,7 @@ class ChatServer:
             client_msg = shared.receive(sock)
             if client_msg is None:
                 print("Disconnect detected. TODO: debug level, client ID report, ...")
+                _ = self.connections.pop(sock, None)
                 _ = self.selectors.unregister(sock)
                 sock.close()
             else:
