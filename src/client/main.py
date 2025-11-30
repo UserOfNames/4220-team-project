@@ -146,16 +146,20 @@ class ChatClient:
                     print(channel)
 
             case events.EventJoin(new_user_nick=new_user_nick, channel=channel):
-                pass
+                print(f"{new_user_nick} has joined {channel}.")
 
             case events.EventLeave(left_user_nick=left_user_nick, channel=channel):
-                pass
+                print(f"{left_user_nick} has left {channel}")
 
             case events.EventError(error=error):
-                pass
+                print(f"[Server] ERROR: {error}")
+
+            case _:
+                print("[Server] Unknown event received.")
 
     def send_message(self, message: str):
-        msg_obj = commands.CmdSendMessage(message, "channel placeholder")
+        # TODO: Don't hardcode the channel
+        msg_obj = commands.CmdSendMessage(message, "General")
         self.send_to_server(msg_obj)
 
     def run(self):

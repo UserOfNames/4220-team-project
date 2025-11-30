@@ -68,14 +68,22 @@ class ChatServer:
 
         self.selectors.close()
 
+    # Process commands from the client.
     def _handle_command(self, origin: socket, msg: commands.CommandObject):
+        origin_nick = self.connections[origin]
+
         match msg:
             case commands.CmdSendMessage(message=message, channel=channel):
-                sender_nick = self.connections[origin]
-                response = events.EventReceiveMessage(sender_nick, message, channel)
-                for conn in self.connections.keys():
-                    if conn != origin:
-                        shared.send(response, conn)
+                try:
+                    target = self.channels[channel]
+                except KeyError:
+                    error = events.EventError(f"Channel {channel} not found")
+                    shared.send(error, origin)
+                    return
+
+                response = events.EventReceiveMessage(origin_nick, message, channel)
+                for conn in target:
+                    shared.send(response, conn)
 
             case commands.CmdList():
                 num_users = len(self.connections)
@@ -84,18 +92,46 @@ class ChatServer:
                 shared.send(response, origin)
 
             case commands.CmdNick(nickname=nick):
-                print(f"Nick {nick}")
                 if nick in self.connections.values():
-                    # TODO: Error event; duplicate nickname
-                    pass
+                    error = events.EventError("Duplicate nickname")
+                    shared.send(error, origin)
                 else:
                     self.connections[origin] = nick
 
             case commands.CmdJoin(channel=channel):
-                print(f"Join {channel}")
+                try:
+                    target = self.channels[channel]
+                except KeyError:
+                    error = events.EventError(f"Channel {channel} not found")
+                    shared.send(error, origin)
+                    return
+
+                target.add(origin)
+                response = events.EventJoin(origin_nick, channel)
+                for conn in target:
+                    shared.send(response, conn)
 
             case commands.CmdLeave(channel=channel):
-                print(f"Leave {channel}")
+                # TODO: Solve the channel None issue; this will require some
+                # remodeling some stuff, like making the client track the active
+                # channel, removing the None case and sending the active channel,
+                # etc.
+                if channel not in self.channels:
+                    error = events.EventError(f"Channel {channel} not found")
+                    shared.send(error, origin)
+                    return
+
+                try:
+                    target = self.channels[channel]
+                    target.remove(origin)
+                except KeyError:
+                    error = events.EventError(f"Not a member of {channel}")
+                    shared.send(error, origin)
+                    return
+
+                response = events.EventLeave(origin_nick, channel)
+                for conn in target:
+                    shared.send(response, conn)
 
             case _:
                 print(f"Error: Unknown command {msg} TODO client ID report", file=stderr)
