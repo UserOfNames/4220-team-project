@@ -44,8 +44,6 @@ class ChatServer:
         # Dictionary of active connections, mapping sockets to nicknames.
         self.connections: dict[socket, str] = {}
 
-        # TODO: Maybe don't hardcode the channels? Where would channel config go?
-        # Dictionary of channels, mapping channel names to connections.
         self.channels: dict[str, set[socket]] = {
             "General": set(),
             "Meta": set(),

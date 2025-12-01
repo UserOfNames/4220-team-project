@@ -47,4 +47,16 @@ repeated connecting and disconnecting, multiple clients, invalid commands,
 invalid arguments to commands, etc.
 
 # Observations and roles
-TODO
+Alphonse Amobi: Recorded the video demo.
+Viktorio Garev: Created the team Discord server.
+Zachary Dierberger: Wrote the program & recorded the code walkthrough.
+
+The development process was pretty straightforward. Most of the code was just
+somewhat tedious control flow management, matching events and commands, and
+creating the logic to manage server and client state. The hardest part was
+getting the multithreading to work, especially on the client side. The server's
+worker-based threading model was pretty easy to set up, but the client's
+threading model included a server listener (to handle events) and a user input
+listener (to form commands). Coordinating the two was surprisingly tricky.
+
+The repo is at https://github.com/UserOfNames/4220-team-project
