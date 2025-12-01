@@ -47,9 +47,9 @@ repeated connecting and disconnecting, multiple clients, invalid commands,
 invalid arguments to commands, etc.
 
 # Observations and roles
-Alphonse Amobi: Recorded the video demo.
-Viktorio Garev: Created the team Discord server.
-Zachary Dierberger: Wrote the program & recorded the code walkthrough.
+- Alphonse Amobi: Recorded the video demo.
+- Viktorio Garev: Created the team Discord server.
+- Zachary Dierberger: Wrote the program & recorded the code walkthrough.
 
 The development process was pretty straightforward. Most of the code was just
 somewhat tedious control flow management, matching events and commands, and
